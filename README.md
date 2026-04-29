@@ -15,12 +15,16 @@ Sit it beside your game and track exactly what you need to unlock next — sorte
 - Personality reactions for rare achievements (≤5%)
 - Floating overlay window — always on top, draggable, dark theme
 - Search your game library
-- Handles games with no achievements gracefully
 
 ## Why not just use Steam's overlay?
 
 Steam's built-in overlay shows achievements but doesn't sort them by difficulty.
 SteamCompletionist shows you the **easiest wins first** so you know exactly where to start.
+
+## Preview
+
+<img width="373" height="547" alt="image" src="https://github.com/user-attachments/assets/64583d8c-ec39-48ce-b491-305af11cd06d" />
+<img width="373" height="552" alt="image" src="https://github.com/user-attachments/assets/8c3b0d8f-2951-4139-ad4a-e6d03095e29e" />
 
 ## Setup
 
