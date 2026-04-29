@@ -1,6 +1,7 @@
 import requests
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import tkinter as tk
 from dotenv import load_dotenv
 
@@ -111,10 +112,10 @@ def get_global_percentages(appid):
     return {a["name"]: a["percent"] for a in achievements}
 
 
-def build_enriched(achievements, schema, percentages):
-    missing = [a for a in achievements if a.get("achieved", 0) == 0]
+def build_enriched(achievements, schema, percentages, include_all=False):
+    items = achievements if include_all else [a for a in achievements if a.get("achieved", 0) == 0]
     enriched = []
-    for a in missing:
+    for a in items:
         apiname = a["apiname"]
         info = schema.get(apiname, {})
         enriched.append({
@@ -163,6 +164,7 @@ class App(tk.Tk):
         self._drag_x = self._drag_y = 0
         self._games  = []
         self._active_canvas = None
+        self._cache = {}
 
         self.content = tk.Frame(self, bg=BG)
         self.content.pack(fill="both", expand=True)
@@ -329,10 +331,9 @@ class App(tk.Tk):
         tk.Frame(self.content, bg=SEP, height=1).pack(fill="x")
 
         count_var = tk.StringVar()
-        count_lbl = tk.Label(self.content, textvariable=count_var,
-                             bg=BG, fg=DIM, font=FONT_MONO,
-                             anchor="w", padx=8, pady=2)
-        count_lbl.pack(fill="x")
+        tk.Label(self.content, textvariable=count_var,
+                 bg=BG, fg=DIM, font=FONT_MONO,
+                 anchor="w", padx=8, pady=2).pack(fill="x")
         tk.Frame(self.content, bg=SEP, height=1).pack(fill="x")
 
         inner = self._scrollable()
@@ -353,11 +354,22 @@ class App(tk.Tk):
         _render()
 
     def _fetch_achievements(self, game):
+        appid = game["appid"]
+        if appid in self._cache:
+            ach, err, schema, pcts = self._cache[appid]
+            self._show_achievements(game, ach, err, schema, pcts)
+            return
+
         self._splash(f"loading {game['name'][:32]}...")
         def work():
-            ach, err = get_achievements(game["appid"])
-            schema   = get_achievement_schema(game["appid"])
-            pcts     = get_global_percentages(game["appid"])
+            with ThreadPoolExecutor(max_workers=3) as ex:
+                f_ach    = ex.submit(get_achievements, appid)
+                f_schema = ex.submit(get_achievement_schema, appid)
+                f_pcts   = ex.submit(get_global_percentages, appid)
+                ach, err = f_ach.result()
+                schema   = f_schema.result()
+                pcts     = f_pcts.result()
+            self._cache[appid] = (ach, err, schema, pcts)
             self.after(0, lambda: self._show_achievements(game, ach, err, schema, pcts))
         threading.Thread(target=work, daemon=True).start()
 
@@ -389,18 +401,7 @@ class App(tk.Tk):
                      bg=BG2, fg=TEXT,
                      font=FONT_MONO, justify="center", pady=6
                      ).pack(fill="x", padx=6, pady=(4, 0))
-            enriched = []
-            for a in achievements:
-                apiname = a["apiname"]
-                info = schema.get(apiname, {})
-                enriched.append({
-                    "apiname":      apiname,
-                    "display_name": info.get("displayName", apiname),
-                    "description":  info.get("description", ""),
-                    "hidden":       int(info.get("hidden", 0)),
-                    "percent":      float(pcts.get(apiname) or 0.0),
-                })
-            enriched.sort(key=lambda x: x["percent"], reverse=True)
+            enriched = build_enriched(achievements, schema, pcts, include_all=True)
 
         label = (f"  all {total} achievements  |  sorted by global %"
                  if all_done else
