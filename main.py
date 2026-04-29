@@ -11,7 +11,6 @@ STEAM_ID = os.getenv("STEAM_ID", "").strip()
 
 BG     = "#0d0d0d"
 BG2    = "#151515"
-ACCENT = "#ffffff"
 TEXT   = "#ffffff"
 DIM    = "#555555"
 SEP    = "#2a2a2a"
