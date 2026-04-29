@@ -13,6 +13,33 @@ STEAM_ID = os.getenv("STEAM_ID", "").strip()
 
 console = Console()
 
+ART_NO_ACHIEVEMENTS = """\
+      (  °  o  °  )
+       \\ _______ /    This game has no achievements...
+        |       |     must be a pure experience!
+"""
+
+ART_NO_DESCRIPTION = """\
+      ( °_° ?)
+       \\     /    No description found...
+        |   |     what does this thing even do?
+"""
+
+ART_PRIVATE = """\
+   | | | | | | | | | |
+   |   °       °     |    This profile is private.
+   | | | | | | | | | |         ( nice try )
+"""
+
+ART_ALL_COMPLETE = """\
+        ___
+       (   )
+        | |       All achievements unlocked!
+       _|_|_      You are a true completionist!
+      [_____]
+"""
+
+
 def get_games():
     url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
     params = {
@@ -20,7 +47,7 @@ def get_games():
         "steamid": STEAM_ID,
         "include_appinfo": 1,
         "include_played_free_games": 1,
-        "format": "json"
+        "format": "json",
     }
     response = requests.get(url, params=params)
     if not response.ok:
@@ -28,23 +55,24 @@ def get_games():
         return []
     return response.json()["response"]["games"]
 
+
 def get_achievements(appid):
+    """Returns (achievements_list, error_type).
+    error_type is None on success, 'private', 'no_stats', or 'api_error' on failure.
+    """
     url = "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/"
-    params = {
-        "key": API_KEY,
-        "steamid": STEAM_ID,
-        "appid": appid,
-        "format": "json"
-    }
+    params = {"key": API_KEY, "steamid": STEAM_ID, "appid": appid, "format": "json"}
     response = requests.get(url, params=params)
     if not response.ok:
-        console.print(f"[red]Error {response.status_code}: Could not fetch achievements.[/red]")
-        return []
-    data = response.json()
-    if not data.get("playerstats", {}).get("success"):
-        console.print("[yellow]No achievement data available for this game.[/yellow]")
-        return []
-    return data["playerstats"]["achievements"]
+        return None, "api_error"
+    stats = response.json().get("playerstats", {})
+    if not stats.get("success"):
+        error = stats.get("error", "").lower()
+        if "private" in error or "not public" in error:
+            return None, "private"
+        return None, "no_stats"
+    return stats["achievements"], None
+
 
 def get_achievement_schema(appid):
     url = "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/"
@@ -55,6 +83,7 @@ def get_achievement_schema(appid):
     stats = response.json().get("game", {}).get("availableGameStats", {})
     return {a["name"]: a for a in stats.get("achievements", [])}
 
+
 def get_global_percentages(appid):
     url = "https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/"
     params = {"gameid": appid}
@@ -64,6 +93,49 @@ def get_global_percentages(appid):
     achievements = response.json().get("achievementpercentages", {}).get("achievements", [])
     return {a["name"]: a["percent"] for a in achievements}
 
+
+def build_enriched(achievements, schema, percentages):
+    missing = [a for a in achievements if a.get("achieved", 0) == 0]
+    enriched = []
+    for a in missing:
+        apiname = a["apiname"]
+        info = schema.get(apiname, {})
+        enriched.append({
+            "apiname": apiname,
+            "display_name": info.get("displayName", apiname),
+            "description": info.get("description", ""),
+            "percent": float(percentages.get(apiname) or 0.0),
+        })
+    enriched.sort(key=lambda x: x["percent"], reverse=True)
+    return enriched
+
+
+def make_ach_table(enriched, game_name, total):
+    table = Table(
+        title=f"Missing Achievements — {game_name}  ({len(enriched)} / {total} missing)",
+        header_style="bold magenta",
+    )
+    table.add_column("#", style="dim", width=5)
+    table.add_column("Achievement", min_width=35)
+    table.add_column("Global %", justify="right", width=20)
+    for i, a in enumerate(enriched, 1):
+        pct = a["percent"]
+        if pct >= 90:
+            tag = "  [gold1](very easy)[/gold1]"
+        elif pct >= 50:
+            tag = "  [green](easy)[/green]"
+        elif pct <= 5:
+            tag = "  [red](rare)[/red]"
+        else:
+            tag = ""
+        table.add_row(str(i), a["display_name"], f"{pct:.1f}%{tag}")
+    return table
+
+
+def prompt_enter(msg="Press Enter to continue"):
+    IntPrompt.ask(f"\n{msg}", default=0)
+
+
 if __name__ == "__main__":
     games = get_games()
     if not games:
@@ -72,78 +144,113 @@ if __name__ == "__main__":
 
     games = sorted(games, key=lambda g: g["name"])
 
-    table = Table(title="Your Steam Library", show_header=True, header_style="bold cyan")
-    table.add_column("#", style="dim", width=5)
-    table.add_column("Game", min_width=30)
-    table.add_column("Playtime (hrs)", justify="right")
-
+    games_table = Table(title="Your Steam Library", show_header=True, header_style="bold cyan")
+    games_table.add_column("#", style="dim", width=5)
+    games_table.add_column("Game", min_width=30)
+    games_table.add_column("Playtime (hrs)", justify="right")
     for i, game in enumerate(games, 1):
-        hours = f"{game['playtime_forever'] / 60:.1f}"
-        table.add_row(str(i), game["name"], hours)
+        games_table.add_row(str(i), game["name"], f"{game['playtime_forever'] / 60:.1f}")
 
-    console.print(table)
-
-    choice = IntPrompt.ask("Pick a game by number", default=1)
-    if not 1 <= choice <= len(games):
-        console.print("[red]Invalid selection.[/red]")
-        raise SystemExit(1)
-
-    selected = games[choice - 1]
-    console.print(f"\n[bold green]Fetching data for:[/bold green] {selected['name']}\n")
-
-    achievements = get_achievements(selected["appid"])
-    schema = get_achievement_schema(selected["appid"])
-    percentages = get_global_percentages(selected["appid"])
-
-    missing_raw = [a for a in achievements if a["achieved"] == 0]
-
-    enriched = []
-    for a in missing_raw:
-        apiname = a["apiname"]
-        info = schema.get(apiname, {})
-        enriched.append({
-            "apiname": apiname,
-            "display_name": info.get("displayName", apiname),
-            "description": info.get("description", "No description available."),
-            "percent": float(percentages.get(apiname) or 0.0),
-        })
-
-    enriched.sort(key=lambda a: a["percent"], reverse=True)
-
-    if not enriched:
-        console.print("[green]You have all achievements for this game![/green]")
-        raise SystemExit(0)
-
-    ach_table = Table(
-        title=f"Missing Achievements — {selected['name']} ({len(enriched)} / {len(achievements)} missing)",
-        header_style="bold magenta"
-    )
-    ach_table.add_column("#", style="dim", width=5)
-    ach_table.add_column("Achievement", min_width=35)
-    ach_table.add_column("Global %", justify="right", width=10)
-
-    for i, a in enumerate(enriched, 1):
-        ach_table.add_row(str(i), a["display_name"], f"{a['percent']:.1f}%")
-
-    while True:
+    while True:  # outer: game selection
         console.clear()
-        console.print(ach_table)
+        console.print(games_table)
 
-        pick = IntPrompt.ask("\nPick an achievement for details (0 to quit)", default=0)
-        if pick == 0:
+        choice = IntPrompt.ask("\nPick a game by number (0 to quit)", default=0)
+        if choice == 0:
             break
-        if not 1 <= pick <= len(enriched):
-            console.print("[red]Invalid selection.[/red]")
+        if not 1 <= choice <= len(games):
             continue
 
-        chosen = enriched[pick - 1]
-        console.clear()
-        console.print(Panel(
-            f"[bold white]{chosen['display_name']}[/bold white]\n\n"
-            f"{chosen['description']}\n\n"
-            f"[cyan]Global completion rate: {chosen['percent']:.1f}%[/cyan]",
-            title="[bold magenta]Achievement Detail[/bold magenta]",
-            border_style="magenta",
-            padding=(1, 2),
-        ))
-        IntPrompt.ask("\nPress Enter to go back", default=0)
+        selected = games[choice - 1]
+        console.print(f"\n[bold green]Fetching data for:[/bold green] {selected['name']}\n")
+
+        achievements, error = get_achievements(selected["appid"])
+
+        if error == "private":
+            console.print(Panel(
+                f"[yellow]{ART_PRIVATE}[/yellow]",
+                title="[red]Private Profile[/red]",
+                border_style="red",
+                padding=(1, 2),
+            ))
+            prompt_enter("Press Enter to pick another game")
+            continue
+
+        schema = get_achievement_schema(selected["appid"])
+        percentages = get_global_percentages(selected["appid"])
+
+        if error in ("api_error", "no_stats"):
+            if not schema:
+                console.print(Panel(
+                    f"[yellow]{ART_NO_ACHIEVEMENTS}[/yellow]",
+                    title="[yellow]No Achievements[/yellow]",
+                    border_style="yellow",
+                    padding=(1, 2),
+                ))
+                prompt_enter("Press Enter to pick another game")
+                continue
+            # No player stats but schema exists — show all as unachieved
+            achievements = [{"apiname": name, "achieved": 0} for name in schema]
+
+        enriched = build_enriched(achievements, schema, percentages)
+        total = len(achievements)
+
+        if not schema and not enriched:
+            console.print(Panel(
+                f"[yellow]{ART_NO_ACHIEVEMENTS}[/yellow]",
+                title="[yellow]No Achievements[/yellow]",
+                border_style="yellow",
+                padding=(1, 2),
+            ))
+            prompt_enter("Press Enter to pick another game")
+            continue
+
+        if not enriched:
+            console.print(Panel(
+                f"[green]{ART_ALL_COMPLETE}[/green]",
+                title="[gold1]Completionist![/gold1]",
+                border_style="gold1",
+                padding=(1, 2),
+            ))
+            prompt_enter("Press Enter to pick another game")
+            continue
+
+        ach_table = make_ach_table(enriched, selected["name"], total)
+
+        while True:  # inner: achievement selection
+            console.clear()
+            console.print(ach_table)
+
+            pick = IntPrompt.ask("\nPick an achievement for details (0 to go back)", default=0)
+            if pick == 0:
+                break
+            if not 1 <= pick <= len(enriched):
+                continue
+
+            chosen = enriched[pick - 1]
+            desc = chosen["description"].strip()
+            if desc:
+                desc_text = desc
+            else:
+                desc_text = f"[dim]{ART_NO_DESCRIPTION}[/dim]"
+
+            pct = chosen["percent"]
+            if pct >= 90:
+                diff_tag = "  [gold1](very easy)[/gold1]"
+            elif pct >= 50:
+                diff_tag = "  [green](easy)[/green]"
+            elif pct <= 5:
+                diff_tag = "  [red](rare)[/red]"
+            else:
+                diff_tag = ""
+
+            console.clear()
+            console.print(Panel(
+                f"[bold white]{chosen['display_name']}[/bold white]\n\n"
+                f"{desc_text}\n\n"
+                f"[cyan]Global completion rate: {pct:.1f}%[/cyan]{diff_tag}",
+                title="[bold magenta]Achievement Detail[/bold magenta]",
+                border_style="magenta",
+                padding=(1, 2),
+            ))
+            prompt_enter("Press Enter to go back")
