@@ -105,7 +105,7 @@ if __name__ == "__main__":
             "apiname": apiname,
             "display_name": info.get("displayName", apiname),
             "description": info.get("description", "No description available."),
-            "percent": percentages.get(apiname, 0.0),
+            "percent": float(percentages.get(apiname) or 0.0),
         })
 
     enriched.sort(key=lambda a: a["percent"], reverse=True)
@@ -125,21 +125,25 @@ if __name__ == "__main__":
     for i, a in enumerate(enriched, 1):
         ach_table.add_row(str(i), a["display_name"], f"{a['percent']:.1f}%")
 
-    console.print(ach_table)
+    while True:
+        console.clear()
+        console.print(ach_table)
 
-    pick = IntPrompt.ask("\nPick an achievement for details (0 to quit)", default=0)
-    if pick == 0:
-        raise SystemExit(0)
-    if not 1 <= pick <= len(enriched):
-        console.print("[red]Invalid selection.[/red]")
-        raise SystemExit(1)
+        pick = IntPrompt.ask("\nPick an achievement for details (0 to quit)", default=0)
+        if pick == 0:
+            break
+        if not 1 <= pick <= len(enriched):
+            console.print("[red]Invalid selection.[/red]")
+            continue
 
-    chosen = enriched[pick - 1]
-    console.print(Panel(
-        f"[bold white]{chosen['display_name']}[/bold white]\n\n"
-        f"{chosen['description']}\n\n"
-        f"[cyan]Global completion rate: {chosen['percent']:.1f}%[/cyan]",
-        title="[bold magenta]Achievement Detail[/bold magenta]",
-        border_style="magenta",
-        padding=(1, 2),
-    ))
+        chosen = enriched[pick - 1]
+        console.clear()
+        console.print(Panel(
+            f"[bold white]{chosen['display_name']}[/bold white]\n\n"
+            f"{chosen['description']}\n\n"
+            f"[cyan]Global completion rate: {chosen['percent']:.1f}%[/cyan]",
+            title="[bold magenta]Achievement Detail[/bold magenta]",
+            border_style="magenta",
+            padding=(1, 2),
+        ))
+        IntPrompt.ask("\nPress Enter to go back", default=0)
