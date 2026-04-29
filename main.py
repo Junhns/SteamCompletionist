@@ -32,11 +32,16 @@ ART_PRIVATE = """\
 """
 
 ART_ALL_COMPLETE = """\
-        ___
-       (   )
-        | |       All achievements unlocked!
-       _|_|_      You are a true completionist!
-      [_____]
+          *
+         /|\\
+        / | \\
+       (  |  )
+       (^‿^)/    All achievements unlocked!
+      /(   )\\    You are a true completionist!
+        | |
+       [_O_]
+       \\___/
+        |||
 """
 
 
@@ -133,7 +138,7 @@ def make_ach_table(enriched, game_name, total):
 
 
 def prompt_enter(msg="Press Enter to continue"):
-    IntPrompt.ask(f"\n{msg}", default=0)
+    input(f"\n{msg}...")
 
 
 if __name__ == "__main__":
@@ -244,11 +249,24 @@ if __name__ == "__main__":
             else:
                 diff_tag = ""
 
+            if pct <= 5:
+                rare_block = (
+                    f"\n\n[red bold]"
+                    f"     _____\n"
+                    f"    (° o °)   w-woah...\n"
+                    f"   (       )  only {pct:.1f}%?!\n"
+                    f"    ~~~~~~~"
+                    f"[/red bold]"
+                )
+            else:
+                rare_block = ""
+
             console.clear()
             console.print(Panel(
                 f"[bold white]{chosen['display_name']}[/bold white]\n\n"
                 f"{desc_text}\n\n"
-                f"[cyan]Global completion rate: {pct:.1f}%[/cyan]{diff_tag}",
+                f"[cyan]Global completion rate: {pct:.1f}%[/cyan]{diff_tag}"
+                f"{rare_block}",
                 title="[bold magenta]Achievement Detail[/bold magenta]",
                 border_style="magenta",
                 padding=(1, 2),
