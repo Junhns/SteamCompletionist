@@ -53,7 +53,7 @@ ART_PRIVATE = (
 ART_ALL_COMPLETE = (
     "    /\\\n"
     "   /  \\\n"
-    "   \(^o^)/\n"
+    "   \\(^o^)/\n"
     "   (    )\n"
     "   |  |\n"
     " all done!!"
@@ -266,8 +266,8 @@ class App(tk.Tk):
         inner.pack(fill="x")
 
         r = tk.Label(inner, text=right, bg=BG, fg=right_color,
-                     font=FONT_MONO, anchor="e", width=14)
-        r.pack(side="right")
+                     font=FONT_MONO, anchor="e")
+        r.pack(side="right", padx=(4, 0))
 
         l = tk.Label(inner, text=left, bg=BG, fg=TEXT,
                      font=FONT_MONO, anchor="w")
@@ -290,7 +290,7 @@ class App(tk.Tk):
     def _inline_msg(self, title, art, color):
         tk.Label(self.content, text=title, bg=BG, fg=color,
                  font=FONT_BOLD, pady=4).pack(pady=(30, 4))
-        tk.Label(self.content, text=art, bg=BG, fg=DIM,
+        tk.Label(self.content, text=art, bg=BG, fg=TEXT,
                  font=FONT_MONO, justify="center").pack()
         tk.Button(self.content, text="<-- back to games", bg=BG, fg=DIM,
                   bd=0, padx=8, pady=4, cursor="hand2", font=FONT_MONO,
@@ -438,10 +438,10 @@ class App(tk.Tk):
                      font=FONT_MONO, wraplength=340,
                      justify="left", pady=6).pack(**pad)
         elif hidden:
-            tk.Label(inner, text=ART_SECRET, bg=BG, fg=DIM,
+            tk.Label(inner, text=ART_SECRET, bg=BG, fg=TEXT,
                      font=FONT_MONO, justify="left", pady=6).pack(**pad)
         else:
-            tk.Label(inner, text=ART_NO_DESCRIPTION, bg=BG, fg=DIM,
+            tk.Label(inner, text=ART_NO_DESCRIPTION, bg=BG, fg=TEXT,
                      font=FONT_MONO, justify="left", pady=6).pack(**pad)
 
         tk.Frame(inner, bg=SEP, height=1).pack(fill="x", padx=12, pady=6)
