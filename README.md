@@ -25,6 +25,8 @@ SteamCompletionist shows you the **easiest wins first** so you know exactly wher
 
 <img width="373" height="547" alt="image" src="https://github.com/user-attachments/assets/64583d8c-ec39-48ce-b491-305af11cd06d" />
 
+<br><br>
+
 <img width="373" height="552" alt="image" src="https://github.com/user-attachments/assets/8c3b0d8f-2951-4139-ad4a-e6d03095e29e" />
 
 ## Setup
