@@ -459,7 +459,7 @@ class App(tk.Tk):
             tk.Label(inner,
                      text=(f"     _____\n"
                            f"    (° o °)   w-woah...\n"
-                           f"          )  only {pct:.1f}%?!\n"
+                           f"   (      )  only {pct:.1f}%?!\n"
                            f"    ~~~~~~~"),
                      bg=BG, fg="#f44336",
                      font=("Consolas", 10, "bold"),
